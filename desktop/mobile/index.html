@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>派对软件 · 我的任务</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body><main>
+<header><span>派对软件 - 狼森</span><h1>客官,YOU HAPPY？</h1><p>A去找B，由B对A完成任务。A不配合，B不给验收码，A受罚。</p></header>
+<p id="connection" role="status"></p>
+<section id="claim" hidden><h2>先找到自己的名字</h2><p>选择自己的编号和姓名，领取后即可查看任务和验收码。</p><label>我是<select id="player"><option value="">请选择本人</option></select></label><button id="join">这是我，领取任务</button></section>
+<div id="cards" hidden>
+<div id="incomingList"><section class="private"><h2 class="accept-heading">我负责验收</h2><h3 id="visitor"></h3><p id="incomingTask" class="task"></p><p>你要对来找你的人完成上面的事件。对方配合、你认可后，把下面的码告诉他，让他在自己的页面提交；对方不配合则不给码，由对方受罚。</p><strong id="acceptCode" class="bigcode"></strong><p id="inStatus"></p></section></div>
+<section><span class="label">我的任务</span><h2 id="self"></h2><p class="target-label">现在去找</p><h2 id="target"></h2><p id="task" class="task"></p><p id="outStatus"></p><form id="verify"><label>配合对方完成事件后，向对方索要六位验收码<input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="输入六位数字" autocomplete="off" required></label><button id="submit">提交验收</button></form></section>
+</div>
+<p id="message" role="alert"></p><button id="retry" class="secondary" hidden>重新选择本人 / 更换手机</button><footer>保持此页面打开即可。离开页面后，请用同一个浏览器重新扫码。<br>手机断网不会丢掉已登记的完成结果。</footer>
+</main></body></html>

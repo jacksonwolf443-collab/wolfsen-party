@@ -1,0 +1,14 @@
+Google MediaPipe Face Mesh, TFJS face_mesh version 1.
+Copyright Google LLC. Apache License 2.0.
+Used locally for geometric landmarks only; no recognition/identity embedding.
+Apache 2.0 full text is bundled at ../MODNet-LICENSE.txt.
+
+Official model entry:
+https://tfhub.dev/mediapipe/tfjs-model/face_landmarks_detection/face_mesh/1
+Official pipeline and semantic landmark connections:
+https://github.com/tensorflow/tfjs-models/tree/master/face-landmarks-detection
+
+model.json (100158 bytes):
+SHA256 074a5d7143977d5e08a049c46a743e5b924aad79e7e69c7079bc2e083def62e6
+group1-shard1of1.bin (1477958 bytes):
+SHA256 3826da640b0a3021161605369ee6af293f75d518040355b960ec71a3390c1c0b

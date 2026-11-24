@@ -1,0 +1,74 @@
+{
+  "points": {
+    "id": "points",
+    "title": "今晚最强王者",
+    "legacyTitles": [
+      "全晚积分王"
+    ],
+    "description": "按全场真实积分排名第一",
+    "rank": 1,
+    "unit": "分",
+    "reward": "由主持人自定",
+    "celebration": "continuous-confetti"
+  },
+  "points-second": {
+    "id": "points-second",
+    "title": "今晚的亚军",
+    "description": "按全场真实积分排名第二",
+    "rank": 2,
+    "unit": "分",
+    "reward": "由主持人自定"
+  },
+  "points-third": {
+    "id": "points-third",
+    "title": "今晚的季军",
+    "description": "按全场真实积分排名第三",
+    "rank": 3,
+    "unit": "分",
+    "reward": "由主持人自定"
+  },
+  "wins": {
+    "id": "wins",
+    "title": "今晚胜利次数最多",
+    "legacyTitles": [
+      "全晚胜场王"
+    ],
+    "description": "已记录并确认的游戏胜场最多",
+    "unit": "次",
+    "reward": "由主持人自定"
+  },
+  "popularity": {
+    "id": "popularity",
+    "title": "今晚人气王",
+    "legacyTitles": [
+      "全晚人气上场王"
+    ],
+    "description": "今晚累计被抽中次数最多",
+    "unit": "次",
+    "reward": "由主持人自定"
+  },
+  "partner-star": {
+    "id": "partner-star",
+    "title": "搭档默契之星",
+    "description": "主持人评选",
+    "source": "host"
+  },
+  "comeback-king": {
+    "id": "comeback-king",
+    "title": "逆转之王",
+    "description": "主持人评选",
+    "source": "host"
+  },
+  "atmosphere-star": {
+    "id": "atmosphere-star",
+    "title": "气氛担当",
+    "description": "主持人评选",
+    "source": "host"
+  },
+  "audience-choice": {
+    "id": "audience-choice",
+    "title": "观众心选",
+    "description": "主持人评选",
+    "source": "host"
+  }
+}

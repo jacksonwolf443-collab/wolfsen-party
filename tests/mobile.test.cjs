@@ -1,0 +1,28 @@
+const {createCheckedInPlayer}=require('./helpers/checked-in-player.cjs');
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {Store,createBackend}=require('../desktop/store.cjs');
+test('phone self-selection grants tasks immediately, isolates codes and routes, replaces sessions and persists verification',async t=>{
+ const {createMobileService}=require('../desktop/mobile-service.cjs');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'party-mobile-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const store=new Store(dir),api=createBackend(store),ps=[];
+ for(let i=0;i<3;i++)ps.push((await createCheckedInPlayer(api, {number:String(i+1),name:'手机玩家'+i})).player);
+ await api('state',{kind:'taskBank',value:['介绍一个兴趣'],version:0});await api('mission/start',{minutes:20});
+ const svc=createMobileService({store,backend:api});t.after(()=>svc.stop());await svc.start({port:0});const status=await svc.status(),base='http://127.0.0.1:'+status.port,entry=new URL(status.url).hash.slice(1);
+ const req=async(route,{token,entryToken,body,method}={})=>{const r=await fetch(base+route,{method:method??(body?'POST':'GET'),headers:{...(token?{Authorization:'Bearer '+token}:{}),...(entryToken?{'X-Party-Entry':entryToken}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,data:await r.json()}};
+ assert.equal((await req('/api/roster')).status,403);const roster=await req('/api/roster',{entryToken:entry});assert.equal(roster.data.players.length,3);assert.ok(!JSON.stringify(roster).includes('code'));
+ const claim=await req('/api/claim',{entryToken:entry,body:{player:ps[0].id}}),token=claim.data.token;
+ const me=await req('/api/me',{token});assert.equal(me.status,200);assert.equal(me.data.self.id,ps[0].id);assert.equal(claim.data.check,undefined);assert.equal((await svc.status()).pending,undefined);const own=store.data.missions.find(m=>m.actor===ps[0].id),incoming=store.data.missions.find(m=>m.target===ps[0].id);
+ assert.equal(me.data.incoming.code,incoming.code);assert.ok(!JSON.stringify(me.data).includes(own.code));assert.equal(me.data.outgoing.target.id,own.target);
+ for(const route of ['/api/boot','/api/mission/cards','/api/ai/settings','/api/photo?key=party.json','/desktop/main.cjs','/../party.json'])assert.equal((await req(route,{token})).status,404,route);
+ const bad=await fetch(base+'/api/verify',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Origin:'https://evil.test'},body:JSON.stringify({code:own.code})});assert.equal(bad.status,403);
+ assert.equal((await req('/api/verify',{token,body:{code:incoming.code,actor:incoming.actor}})).status,400);assert.equal(store.data.missions.find(m=>m.actor===incoming.actor).completed_at,null);assert.ok(store.data.players.every(p=>p.score===0),'rejected phone verification must not give anyone a point');
+ const targetBefore=store.player(own.target).score;
+ assert.equal((await req('/api/verify',{token,body:{code:own.code}})).status,200);const reopened=new Store(dir);assert.ok(reopened.data.missions.find(m=>m.id===own.id).completed_at);assert.equal(reopened.player(ps[0].id).score,1,'phone acceptance automatically gives its task actor one point');assert.equal(store.player(own.target).score,targetBefore,'the task target does not receive the actor’s completion point');assert.equal((await req('/api/verify',{token,body:{code:own.code}})).data.already,true);assert.equal(store.player(ps[0].id).score,1,'same phone verification cannot add another point');assert.equal(store.data.scoreHistory.filter(x=>x.playerId===ps[0].id&&x.type==='automatic').length,1);
+ await assert.rejects(api('players/attendance',{id:ps[0].id,version:ps[0].version??0,attendance:'away'}),e=>e.status===409,'phone scoring advances the authoritative player version and stale cards remain protected');
+ await api('players/attendance',{id:ps[0].id,version:store.player(ps[0].id).version,attendance:'away'});assert.equal((await req('/api/me',{token})).data.incoming.code,undefined);
+ svc.revoke(ps[0].id);assert.equal((await req('/api/me',{token})).status,403);
+ assert.equal((await req('/api/claim',{entryToken:entry,body:{player:ps[0].id}})).status,400);await api('players/attendance',{id:ps[0].id,version:store.player(ps[0].id).version,attendance:'present'});assert.equal(store.player(ps[0].id).score,1,'changing attendance and re-claiming cannot replay the completion award');
+ const again=await req('/api/claim',{entryToken:entry,body:{player:ps[0].id}});assert.equal((await req('/api/me',{token:again.data.token})).status,200);
+ const changed=await req('/api/claim',{entryToken:entry,token:again.data.token,body:{player:ps[1].id}});assert.equal((await req('/api/me',{token:again.data.token})).status,403);assert.equal((await req('/api/me',{token:changed.data.token})).data.self.id,ps[1].id);assert.equal((await svc.status()).connected.length,1);
+ await svc.stop();await svc.start({port:0});assert.notEqual(new URL((await svc.status()).url).hash.slice(1),entry);assert.equal((await svc.status()).connected.length,0);
+});

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+release/
+*.log
+__pycache__/
+.env
+.env.*
+*.partyserver
+*.jungle
+relay.json
+fixed-server.json
+party.json
+party.json.*
+photos/
+reset-backups/
+*.pem
+*.key

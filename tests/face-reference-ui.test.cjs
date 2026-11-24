@@ -1,0 +1,27 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),ts=require('typescript');
+const {JSDOM}=require('jsdom'),{Store,createBackend}=require('../desktop/store.cjs');
+for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,f);
+test('face selection uses the chosen original-image pixels and saves a separate reference without changing the original',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'party-face-')),dom=new JSDOM('<div id="root"></div>',{url:'https://jungle.test'});
+ global.window=dom.window;global.document=dom.window.document;global.IS_REACT_ACT_ENVIRONMENT=true;
+ const React=require('react'),{act}=React,{createRoot}=require('react-dom/client'),FaceReference=require('../src/face-reference.tsx').default;
+ const store=new Store(dir),api=createBackend(store),png=fs.readFileSync(path.join(__dirname,'../assets/icon.png'));
+ const {key}=await api('upload',{bytes:png,type:'image/png'});const {player}=await api('players',{name:'人脸测试',number:'001',photo:key});
+ const draws=[];dom.window.HTMLCanvasElement.prototype.getContext=()=>({drawImage(...args){draws.push(args)}});
+ dom.window.HTMLCanvasElement.prototype.toBlob=function(cb){cb(new Blob([png],{type:'image/png'}))};
+ window.partyDesktop={call:async(route,body,method)=>{try{return{ok:true,data:await api(route,body,method)}}catch(e){return{ok:false,error:e.message}}}};
+ let refreshed=false,closed=false;const root=createRoot(document.getElementById('root')),flush=()=>new Promise(r=>setImmediate(r));
+ t.after(async()=>{await act(async()=>root.unmount());dom.window.close();delete global.window;delete global.document;delete global.IS_REACT_ACT_ENVIRONMENT;fs.rmSync(dir,{recursive:true,force:true})});
+ await act(async()=>{root.render(React.createElement(FaceReference,{player,ctx:{refresh:async preserve=>{assert.equal(preserve,true);refreshed=true},tell(){}},onClose:()=>closed=true}));await flush()});
+ const image=document.querySelector('.face-selection img');Object.defineProperties(image,{naturalWidth:{value:1000},naturalHeight:{value:800}});
+ await act(async()=>{image.dispatchEvent(new dom.window.Event('load'));await flush()});
+ const box=document.querySelector('.face-selection');box.getBoundingClientRect=()=>({left:0,top:0,width:500,height:400});box.setPointerCapture=()=>{};
+ const pointer=async(type,x,y)=>act(async()=>{const e=new dom.window.MouseEvent(type,{bubbles:true,clientX:x,clientY:y});Object.defineProperty(e,'pointerId',{value:1});box.dispatchEvent(e);await flush()});
+ await pointer('pointerdown',100,40);await pointer('pointermove',300,240);await pointer('pointerup',300,240);
+ assert.deepEqual(draws.at(-1).slice(1).map(Math.round),[200,80,400,400,0,0,400,400]);
+ const save=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='保存人脸参考');assert.equal(save.disabled,false);
+ await act(async()=>{save.click();await flush();await flush()});
+ assert.ok(refreshed&&closed);assert.equal(store.data.players[0].photo,key);assert.ok(store.data.players[0].facePhoto);assert.notEqual(store.data.players[0].facePhoto,key);
+ assert.deepEqual(fs.readFileSync(store.photoPath(key)),png);assert.equal(new Store(dir).data.players[0].facePhoto,store.data.players[0].facePhoto);
+});

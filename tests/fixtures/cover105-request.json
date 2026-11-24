@@ -1,0 +1,36 @@
+{
+  "version": "1.0.5",
+  "sourceZipSHA256": "fd5c682292c71b010ae5b9e0ec6bd74b2f07d8a91a262ffd35ceae608ddb171b",
+  "coverServiceSHA256": "369c720cb1a22fd9c5c731f0b36f2d2c98665742afd43a889087b6cfde86c95b",
+  "coverScenesSHA256": "f0afbd03e798b9c4c801eb10546cd163c0c78a99a4642e1de58b8f1c4431116b",
+  "scene": {
+    "id": "magic-workshop",
+    "label": "魔术伙伴",
+    "setting": "魔术排练室的道具箱旁，两位伙伴手持扑克牌，后方是折叠屏风与魔术台",
+    "clothing": "完整且有个人风格的舞台西装或衬衫长裤",
+    "tags": [
+      "魔术",
+      "表演",
+      "magic"
+    ]
+  },
+  "generationRoute": "/api/v1/services/aigc/multimodal-generation/generation",
+  "generationModel": "qwen-image-3.0-pro",
+  "generationParameters": {
+    "n": 1,
+    "size": "1280*720",
+    "prompt_extend": false,
+    "watermark": false,
+    "negative_prompt": "剪贴画，拼接头像，贴头，贴纸，悬浮头，断颈，颈部接缝，矩形边框，原照片背景残块，重影，同一张脸，模板脸，混合五官，改变发型，塑料皮肤，多余人物，多余肢体，错误场景，文字，水印"
+  },
+  "generationPrompt": "请以两张原照片的主体本人为身份参考，生成一张完整自然的双人真实摄影照片，16:9横版。图一主体本人在左，图二主体本人在右；只使用两位主体，不使用背景路人。本人身份是最高优先级，保留两人各自的脸型、五官形状、五官比例、眼距、鼻形、嘴形、下颌轮廓、年龄特征、肤色、可辨识细节及原有发型，避免通用模板脸和混合五官。沿用各自原照片的表情、头部朝向和视线特点，让身体姿态自然配合，不强制统一寸头、肤色或健美身材。人物帅气精神、自然自信，肩背挺拔，衣服合身，使用柔和的真实摄影光线和皮肤纹理，不靠改动五官制造帅气。\n两人必须是完整连续的真人：头发、头部、耳朵、脸、下巴、脖子、肩膀、躯干和手臂自然连接，头身比例协调、肩颈连续、下巴到颈部过渡真实，肤色、光照、阴影、透视和清晰度一致，呈现同一台相机同一时刻拍摄的完整照片。使用半身至大腿的中近景，脸部清晰可见，两人互动自然，互不遮脸。\n本组唯一主题【魔术伙伴】：魔术排练室的道具箱旁，两位伙伴手持扑克牌，后方是折叠屏风与魔术台。服装：完整且有个人风格的舞台西装或衬衫长裤。背景、服装和动作必须符合此主题，非海边主题不得改成海边。直接输出最终整张完整照片，禁止拼贴、剪纸、贴头、贴纸、悬浮头、断颈、横切接缝、矩形原图背景、分屏或多余人物，不添加文字、标志和水印。",
+  "reviewRoute": "/compatible-mode/v1/chat/completions",
+  "reviewModel": "qwen3-vl-plus",
+  "reviewPrompt": "仅检查这张完整照片的结构与场景，不识别人物身份，不比较人物相似度。输出严格JSON {\"sceneMatches\":true或false,\"completePeople\":true或false,\"naturalBlend\":true或false,\"issue\":\"简短中文原因\"}。应有恰好两位完整自然的人，头部、下巴、脖子、肩膀连续，人物头身比例合理，没有贴头、悬浮头像、裁切矩形边框、脖子横切接缝、原照片背景残块或明显重复肢体；只在有这些明显结构问题时naturalBlend=false。合理的半身构图不算身体不完整。背景和服装须符合主题【魔术伙伴】：魔术排练室的道具箱旁，两位伙伴手持扑克牌，后方是折叠屏风与魔术台。主题明显错误时sceneMatches=false。照片因构图截取腿部不算缺失人物。",
+  "reviewOptions": {
+    "enable_thinking": false,
+    "max_tokens": 2500,
+    "temperature": 0.1
+  },
+  "coverMethod": "identity-guided-photo-v1"
+}

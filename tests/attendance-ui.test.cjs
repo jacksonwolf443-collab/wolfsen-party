@@ -1,0 +1,70 @@
+// Real controls and local persistence; no native window or live AI is exercised.
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),ts=require('typescript');
+const {JSDOM}=require('jsdom');
+const {Store,createBackend}=require('../desktop/store.cjs');
+for(const ext of ['.ts','.tsx'])require.extensions[ext]=(module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,file);
+
+test('the roster attendance button keeps the player and all new game pools skip absent people',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'party-attendance-ui-')),store=new Store(dir),api=createBackend(store);
+ const png=fs.readFileSync(path.join(__dirname,'../assets/icon.png')),{key:photo}=await api('upload',{bytes:png,type:'image/png'});
+ const players=[];for(let i=0;i<4;i++)players.push((await api('players',{name:'出席测试'+i,number:String(i),photo,consent:true})).player);
+ store.commit(d=>{for(const p of d.players)p.attendance='present';return{}});const away=players[0];
+ await api('state',{kind:'truth',value:{stories:[{id:'s',owner:away.id,text:'离场者故事'}],selected:'s',cast:players.slice(0,3).map(p=>p.id),revealed:false},version:0});
+ await api('state',{kind:'tails',value:{scores:{[away.id]:99,[players[1].id]:2},endsAt:0},version:0});
+ await api('state',{kind:'draw',value:{topic:'猫',player:away.id,history:['猫'],endsAt:Date.now()+60000,canvas:'',scores:{},autoGuessEnabled:false},version:0});
+ await api('state',{kind:'taskBank',value:['一起自我介绍'],version:0});await api('mission/start',{minutes:5});
+ const dom=new JSDOM('<div id="root"></div>',{url:'https://jungle.test'});global.window=dom.window;global.document=dom.window.document;global.IS_REACT_ACT_ENVIRONMENT=true;
+ dom.window.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},drawImage(){}});dom.window.HTMLCanvasElement.prototype.toDataURL=()=>'';
+ const React=require('react'),{act}=React,{createRoot}=require('react-dom/client'),PartyConsole=require('../src/console.tsx').default;
+ const root=createRoot(document.getElementById('root')),flush=()=>new Promise(resolve=>setImmediate(resolve));
+ t.mock.timers.enable({apis:['setTimeout','Date'],now:Date.now()});
+ window.partyDesktop={call:async(route,body,method)=>{try{return{ok:true,data:await api(route,body,method)}}catch(e){return{ok:false,error:e.message}}}};
+ t.after(async()=>{await act(async()=>root.unmount());dom.window.close();delete global.window;delete global.document;delete global.IS_REACT_ACT_ENVIRONMENT;fs.rmSync(dir,{recursive:true,force:true})});
+ const click=async el=>{assert.ok(el);await act(async()=>{el.click();await flush()})};
+ const button=text=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()===text);
+ const tab=async prefix=>click(Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.startsWith(/^\d+$/.test(prefix)?require('../src/domain.ts').displayNumber(Number(prefix)).toString().padStart(2,'0'):prefix)));
+ await act(async()=>{root.render(React.createElement(PartyConsole));await flush()});
+ await click(Array.from(document.querySelectorAll('.player-card button')).find(b=>b.textContent.trim()==='签退'));
+ assert.equal(store.data.players.length,4);assert.equal(store.player(away.id).attendance,'away');assert.equal(store.player(away.id).photo,photo);
+ assert.match(document.querySelector('.player-card').textContent,/未签到|已离场/);assert.ok(button('签到'));
+ await tab('02');assert.equal(document.querySelector('.story-list'),null);assert.match(document.querySelector('.activity-rules').textContent,/参与者\+3分/);assert.equal(document.querySelectorAll('.activity-header button,.activity-rules button').length,0,'rules retain no story-editing controls');assert(document.querySelector('.game-win-recorder'),'host can register flexible talent points');assert(!document.querySelector('.game-win-players').textContent.includes(away.name),'departed player cannot be selected for new talent points');
+ for(const option of document.querySelectorAll('option'))assert.notEqual(option.value,away.id);
+ await tab('03');assert.equal(document.querySelectorAll('.tails-awards article').length,3,'new tails UI shows only three pending podium profiles');assert(button('分为3组并开始'));
+ assert.equal(store.state('tails').value.scores[away.id],99,'historical points remain saved');
+ await tab('04');assert.equal(document.querySelector('.check-label input').checked,true,'old false preference does not override the checked entry default');
+ assert.equal(store.state('draw').value.player,'');assert.equal(store.state('draw').value.endsAt,0);
+ for(const option of document.querySelectorAll('option'))assert.notEqual(option.value,away.id);
+ assert.equal(button('开始60秒').disabled,true);assert.equal(button('主持人判定猜中 · 加1分').disabled,true);
+ for(const prefix of ['05','06']){await tab(prefix);for(const option of document.querySelectorAll('option'))assert.notEqual(option.value,away.id)}
+ await tab('07');await click(Array.from(document.querySelectorAll('.section-tabs button')).find(b=>b.textContent.startsWith('分配与验收')));
+ assert.match(document.querySelector('.mission-list').textContent,/暂停 · 参与者未到\/已离场/);
+ for(const option of document.querySelectorAll('option'))assert.notEqual(option.value,away.id);
+ await tab('08');assert.equal(document.querySelector('input[aria-label="抽取人数"]').max,'3');
+ await click(button('随机抽取'));await act(async()=>{t.mock.timers.tick(3000);await flush()});await act(async()=>{t.mock.timers.tick(6000);await flush()});await click(button('确认名单，继续活动'));assert.ok(store.state('lottery').value.people.every(p=>p.id!==away.id));
+ assert.equal(new Store(dir).player(away.id).attendance,'away');
+ await click(Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.startsWith('玩家档案')));
+ await click(button('签到'));assert.equal(store.player(away.id).attendance,'present');assert.equal(store.player(away.id).active,1);
+});
+
+test('a departed drawing player cancels automatic guesses and rejects the late AI response',async t=>{
+ const dom=new JSDOM('<div id="root"></div>',{url:'https://jungle.test'});global.window=dom.window;global.document=dom.window.document;global.IS_REACT_ACT_ENVIRONMENT=true;
+ dom.window.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},drawImage(){}});dom.window.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/png;base64,iVBORw==';
+ const React=require('react'),{act}=React,{createRoot}=require('react-dom/client'),{DrawActivity}=require('../src/visual-activities.tsx');
+ let finishGuess,calls=0;const saved=[],projects=[];
+ window.partyDesktop={call:async(route)=>{assert.equal(route,'ai/guess');calls++;return new Promise(resolve=>finishGuess=()=>resolve({ok:true,data:{text:'不应回来的旧猜测'}}))}};
+ const player={id:'a',name:'画手',number:'001',active:1,photo:'',interests:'',trait:'',consent:1};
+ const ctx={players:[player],bag:{draw:{topic:'猫',player:'a',history:[],endsAt:Date.now()+60000,scores:{},canvas:'',roundId:'r',autoGuessEnabled:false}},ai:{hasKey:true},busy:'',save:async(_kind,value)=>{saved.push(value)},project:async value=>{projects.push(value)},tell:()=>{},run:async(_label,fn)=>fn()};
+ const root=createRoot(document.getElementById('root')),flush=()=>new Promise(resolve=>setImmediate(resolve));
+ t.mock.timers.enable({apis:['setTimeout','setInterval','Date'],now:Date.now()});
+ t.after(async()=>{await act(async()=>root.unmount());dom.window.close();delete global.window;delete global.document;delete global.IS_REACT_ACT_ENVIRONMENT});
+ await act(async()=>{root.render(React.createElement(DrawActivity,{ctx}));await flush()});
+ assert.equal(document.querySelector('.check-label input').checked,true);
+ await act(async()=>{t.mock.timers.tick(4000);await flush()});assert.equal(calls,1);assert.ok(finishGuess);
+ await act(async()=>{root.render(React.createElement(DrawActivity,{ctx:{...ctx,players:[{...player,attendance:'away'}]}}));await flush()});
+ assert.equal(saved.at(-1).player,'');assert.equal(saved.at(-1).endsAt,0);
+ await act(async()=>{finishGuess();await flush();t.mock.timers.tick(8000);await flush()});
+ assert.equal(calls,1);assert.equal(projects.length,0);assert.ok(saved.every(value=>!value.history.includes('不应回来的旧猜测')));
+ assert.equal(document.querySelector('.ai-guess-spotlight strong').textContent,'等待作画');
+});

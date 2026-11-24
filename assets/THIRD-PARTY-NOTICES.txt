@@ -1,0 +1,34 @@
+本程序的本地人像去背景功能使用 MODNet 和 Microsoft ONNX Runtime。
+
+MODNet: Real-Time Trimap-Free Portrait Matting via Objective Decomposition
+Original authors: Zhanghan Ke et al.
+Original project: https://github.com/ZHKKKe/MODNet
+ONNX conversion: https://github.com/yakhyo/modnet
+Model: modnet_photographic.onnx (25,969,398 bytes)
+Source: https://github.com/yakhyo/modnet/releases/download/weights/modnet_photographic.onnx
+SHA-256: 5069a5e306b9f5e9f4f2b0360264c9f8ea13b257c7c39943c7cf6a2ec3a102ae
+License: Apache License 2.0, full text in models/MODNet-LICENSE.txt.
+
+ONNX Runtime 1.30.0
+Copyright Microsoft Corporation. Licensed under the MIT License.
+https://github.com/microsoft/onnxruntime
+Full MIT license text is included in models/ONNX-Runtime-LICENSE.txt.
+
+TensorFlow.js 4.22.0 and BlazeFace 0.1.0
+Copyright Google LLC. Licensed under the Apache License 2.0.
+https://github.com/tensorflow/tfjs
+https://github.com/tensorflow/tfjs-models/tree/master/blazeface
+BlazeFace model published by TensorFlow, version 1:
+https://www.kaggle.com/models/tensorflow/blazeface/tfJs/default/1
+Bundled model.json and group1-shard1of1.bin are used only for local face geometry, not to generate a face.
+The full Apache 2.0 license is included in models/MODNet-LICENSE.txt.
+
+The matting model predicts only a foreground mask. The player's source image supplies all face colour pixels. The model is bundled locally and does not upload photos.
+
+Google MediaPipe Face Mesh, TFJS face_mesh version 1
+Copyright Google LLC. Licensed under the Apache License 2.0.
+https://tfhub.dev/mediapipe/tfjs-model/face_landmarks_detection/face_mesh/1
+https://github.com/tensorflow/tfjs-models/tree/master/face-landmarks-detection
+Bundled locally for 468 geometric landmarks only; no identity recognition or face generation.
+Model provenance and hashes: models/facemesh/MODEL-NOTICE.txt.
+Full Apache 2.0 license: models/MODNet-LICENSE.txt.

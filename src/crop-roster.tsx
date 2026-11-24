@@ -1,0 +1,3 @@
+import React from 'react';
+import {Avatar} from './ui';
+export function CropRoster({people,stage=false}:{people:any[];stage?:boolean}){return <section className={'crop-roster'+(stage?' crop-roster-stage':'')}><div className="crop-roster-intro"><h2>先认识本轮 {people.length} 位玩家</h2><p>请看清他们的样子，接下来的局部照片只从这份名单中抽取。</p></div><div className="crop-roster-grid">{people.map(p=><article key={p.id} className="crop-roster-card" data-roster-player={p.id}><Avatar player={p} size={stage?128:120}/><span>NO. {p.number}</span><h3>{p.name}</h3><p><b>兴趣</b> {p.interests||'尚未填写'}</p><p><b>想做的事</b> {p.wish||'尚未填写'}</p>{!stage&&p.count!==undefined&&<small>入选本轮后 · 今晚第 {p.count} 次被选中</small>}</article>)}</div></section>;}

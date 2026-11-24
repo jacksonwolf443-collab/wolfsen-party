@@ -1,0 +1,12 @@
+{
+  "pairs": [["P001", "P002"], ["P003", "P004"]],
+  "standby": [],
+  "reasons": [
+    {"pair":"G001","basis":"shared-interest","shared":"健身","a":{"field":"interests","quote":"健身、摄影"},"b":{"field":"interests","quote":"健身、摄影"}},
+    {"pair":"G001","basis":"shared-interest","shared":"摄影","a":{"field":"interests","quote":"健身、摄影"},"b":{"field":"interests","quote":"健身、摄影"}},
+    {"pair":"G001","basis":"shared-wish","shared":"一直想尝试双人舞台表演","a":{"field":"wish","quote":"一直想尝试双人舞台表演"},"b":{"field":"wish","quote":"一直想尝试双人舞台表演"}},
+    {"pair":"G002","basis":"shared-interest","shared":"徒步","a":{"field":"interests","quote":"徒步、电影"},"b":{"field":"interests","quote":"徒步、电影"}},
+    {"pair":"G002","basis":"shared-interest","shared":"电影","a":{"field":"interests","quote":"徒步、电影"},"b":{"field":"interests","quote":"徒步、电影"}},
+    {"pair":"G002","basis":"shared-wish","shared":"一直想看极光","a":{"field":"wish","quote":"一直想看极光"},"b":{"field":"wish","quote":"一直想看极光"}}
+  ]
+}

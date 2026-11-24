@@ -1,0 +1,22 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),{JSDOM}=require('jsdom');
+for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,f);
+test('batch regenerates both pasted cover versions, skips completed whole photos and retains source references',async t=>{
+ const dom=new JSDOM('<div id="root"></div>',{url:'https://jungle.test'});global.window=dom.window;global.document=dom.window.document;global.IS_REACT_ACT_ENVIRONMENT=true;
+ const React=require('react'),{act}=React,{createRoot}=require('react-dom/client'),Pairs=require('../src/pair-activity.tsx').default,root=createRoot(document.getElementById('root'));
+ const players=['a','b','c','d','e','f'].map(id=>({id,name:'玩家'+id,number:id,photo:'original-'+id,facePhoto:'manual-'+id,headCutout:'old-cutout-'+id,active:1,attendance:'present',interests:'运动',trait:'特点'}));
+ let pairs={groups:[{id:'old',members:['a','b'],challenge:'',cover:'old-cover',coverMethod:'original-head-composite-v1',alive:true,votes:3},{id:'old-face',members:['c','d'],challenge:'',cover:'old-face-cover',coverMethod:'original-face-region-v1',alive:true,votes:0},{id:'new',members:['e','f'],challenge:'',cover:'new-cover',coverMethod:'whole-photo-v2',alive:true,votes:0}],standby:[],round:1};
+ const calls=[];window.partyDesktop={call:async(route,body)=>{if(route==='photo/data')return{ok:true,data:{data:'data:image/png;base64,eA=='}};calls.push({route,body});assert.equal(route,'ai/cover','cover generation must not request head preparation');return{ok:true,data:{photo:'whole-photo-'+body.groupId,coverMethod:'whole-photo-v2',faceSources:body.ids.map(id=>'original-'+id)}}}};
+ const ctx={players,bag:{pairs},ai:{hasKey:true},busy:'',tell(){},async run(_label,fn){return fn()},async save(kind,input,confirmed){assert.equal(kind,'pairs');assert.equal(confirmed,true);pairs=typeof input==='function'?input(pairs):input},async project(){}};
+ const flush=()=>new Promise(r=>setImmediate(r)),button=text=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()===text),click=async element=>act(async()=>{assert.ok(element);element.click();await flush()});
+ t.after(async()=>{await act(async()=>root.unmount());dom.window.close();delete global.window;delete global.document;delete global.IS_REACT_ACT_ENVIRONMENT});
+ await act(async()=>{root.render(React.createElement(Pairs,{ctx}));await flush()});
+ assert.equal(button('自动准备全部人脸参考'),undefined);assert.ok(document.querySelector('.pair-scene-description').textContent.includes('两张原照'));
+ assert.ok(!document.querySelector('.pair-scene-description').textContent.includes('本机合成'));
+ assert.equal(document.querySelectorAll('.pair-legacy-cover-note').length,2,'both pasted versions are visibly marked without deleting their images');
+ assert.equal(document.querySelector('.pair-cover').getAttribute('src'),'party-photo://local/old-cover');
+ assert.equal(document.querySelector('.pair-face-references'),null,'unused crop controls must not imply that pasted heads are model inputs');
+ assert.deepEqual(Array.from(document.querySelectorAll('.pair-members .avatar img')).map(img=>img.getAttribute('src')),players.map(p=>'party-photo://local/'+p.photo));
+ await click(button('介绍这一组'));assert.equal(document.querySelectorAll('.pair-legacy-cover-note').length,1);
+ await click(button('返回全部组合'));await click(button('给所有组合生成合照'));
+ assert.deepEqual(calls,[{route:'ai/cover',body:{ids:['a','b'],groupId:'old'}},{route:'ai/cover',body:{ids:['c','d'],groupId:'old-face'}}]);assert.equal(pairs.groups[0].cover,'whole-photo-old');assert.equal(pairs.groups[0].votes,3);assert.equal(pairs.groups[1].cover,'whole-photo-old-face');assert.equal(pairs.groups[2].cover,'new-cover');
+});

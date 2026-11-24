@@ -1,0 +1,46 @@
+const {createCheckedInPlayer}=require('./helpers/checked-in-player.cjs');
+// Real components and temporary local storage; no native pixel or live AI assertions.
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),ts=require('typescript');
+const {JSDOM}=require('jsdom'),{Store,createBackend}=require('../desktop/store.cjs');
+for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,f);
+test('pair introductions show only the selected pair and all profile fields; activity resets and random draw work through the UI',async t=>{
+ const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'party-intro-')),dir=path.join(tempRoot,'data'),dom=new JSDOM('<div id="root"></div>',{url:'https://jungle.test'});
+ global.window=dom.window;global.document=dom.window.document;global.IS_REACT_ACT_ENVIRONMENT=true;
+ dom.window.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},drawImage(){}});
+ const React=require('react'),{act}=React,{createRoot}=require('react-dom/client'),Console=require('../src/console.tsx').default;
+ const store=new Store(dir),api=createBackend(store),png=fs.readFileSync(path.join(__dirname,'../assets/icon.png'));
+ const {key}=await api('upload',{bytes:png,type:'image/png'});const ids=[];
+ for(let i=1;i<=4;i++)ids.push((await createCheckedInPlayer(api, {name:'介绍玩家'+i,number:'00'+i,photo:key,interests:'兴趣'+i,trait:'特点'+i,consent:true})).player.id);
+ await api('state',{kind:'pairs',version:0,value:{groups:[{id:'g1',members:ids.slice(0,2),cover:key,scene:'双人场景',challenge:'秘密挑战',alive:true,votes:0},{id:'g2',members:ids.slice(2),cover:'',challenge:'',alive:true,votes:0}],standby:[],round:1}});
+ await api('state',{kind:'tails',version:0,value:{scores:{[ids[0]]:9},endsAt:0}});
+ const clearScopes=[];window.partyDesktop={call:async(route,body,method)=>{try{if(route==='reset/preview')clearScopes.push(body.scope);return{ok:true,data:route==='desktop/fullscreen'?{}:await api(route,body,method)}}catch(e){return{ok:false,error:e.message}}}};
+ const root=createRoot(document.getElementById('root'));t.mock.timers.enable({apis:['setTimeout','Date'],now:Date.now()});
+ t.after(async()=>{await act(async()=>root.unmount());dom.window.close();delete global.window;delete global.document;delete global.IS_REACT_ACT_ENVIRONMENT;fs.rmSync(tempRoot,{recursive:true,force:true})});
+ const flush=()=>new Promise(r=>setImmediate(r));const click=async el=>{assert.ok(el,'control exists');await act(async()=>{el.click();await flush()})};
+ const finishDraw=async()=>{await act(async()=>{t.mock.timers.tick(3000);await flush()});await act(async()=>{t.mock.timers.tick(6000);await flush()});await click(button('确认名单，继续活动'))};
+ const button=text=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()===text);
+ const clearButtons=(global=false)=>{assert.equal(document.querySelectorAll('.page-clear-controls button').length,global?2:1);assert.ok(button('清空当前界面全部内容'));assert.equal(Boolean(button('清空目前所有内容')),global);};
+ const tab=prefix=>click(Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.startsWith(prefix)));
+ const change=async(el,value)=>act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new dom.window.Event('input',{bubbles:true}));await flush()});
+ await act(async()=>{root.render(React.createElement(Console));await flush()});
+ clearButtons();const beforeRosterCancel=structuredClone(store.data);await click(button('清空当前界面全部内容'));assert.equal(clearScopes.at(-1),'players');assert.ok(button('确认清空本界面'));await click(button('取消'));assert.deepEqual(store.data,beforeRosterCancel,'canceling roster clear leaves every profile, score and activity untouched');await tab('AI 与本地存档');clearButtons(true);await click(button('清空目前所有内容'));assert.equal(clearScopes.at(-1),'all');assert.ok(button('确认清空全部活动资料'));await click(button('取消'));assert.deepEqual(store.data,beforeRosterCancel,'canceling global clear is read-only');
+ await tab('01');await click(button('介绍这一组'));
+ let detail=document.querySelector('.pair-introduction');assert.ok(detail);assert.ok(!document.querySelector('.pair-grid'));
+ for(const value of ['介绍玩家1','介绍玩家2','001','兴趣1'])assert.ok(detail.textContent.includes(value));assert(!detail.textContent.includes('特点2'));assert(!detail.textContent.includes('旧版档案备注'));
+ assert.ok(!detail.textContent.includes('介绍玩家3'));assert.equal(detail.querySelectorAll('.intro-original').length,2);
+ await click(button('下一组'));assert.ok(document.querySelector('.pair-introduction').textContent.includes('介绍玩家3'));
+ await click(button('上一组'));await flush();assert.equal(button('更新舞台介绍'),undefined,'explicit introduction automatically updates the selected stage profile');
+ assert.equal(store.state('screen').value.mode,'pair-profile');assert.equal(store.state('screen').value.people[0].interests,'兴趣1');
+ await click(button('返回全部组合'));assert.ok(document.querySelector('.pair-grid'));
+ const beforePairCancel=structuredClone(store.data);await click(button('清空当前界面全部内容'));assert.equal(clearScopes.at(-1),'activity:1');await click(button('取消'));assert.deepEqual(store.data,beforePairCancel,'canceling a single activity clear does not change other activity state either');
+ await click(button('清空当前界面全部内容'));await click(button('确认清空本界面'));await flush();assert.equal(store.state('pairs').value,null);assert.deepEqual(store.state('tails'),beforePairCancel.states.tails,'single activity clear preserves another game and its score');assert.deepEqual(store.data.players,beforePairCancel.players,'single activity clear preserves profiles');
+ for(let n=2;n<=8;n++){await tab('0'+n);assert.ok(document.querySelector('.activity-rules'));clearButtons()}
+ await tab('09');assert.ok(document.querySelector('.global-leaderboard'));clearButtons();const beforeScoreCancel=structuredClone(store.data);await click(button('清空当前界面全部内容'));assert.equal(clearScopes.at(-1),'scores');await click(button('取消'));assert.deepEqual(store.data,beforeScoreCancel,'score-page preview cancellation preserves all score sources');await tab('08');
+ const input=document.querySelector('input[aria-label="抽取人数"]');assert.ok(input);await change(input,'2');await click(button('随机抽取'));await finishDraw();
+ assert.equal(document.querySelectorAll('.lottery-person').length,2);assert.equal(store.state('lottery').value.people.length,2);
+ await tab('03');await tab('08');assert.equal(document.querySelectorAll('.lottery-person').length,2,'results survive activity switching');
+ await change(document.querySelector('input[aria-label="抽取人数"]'),'5');assert.ok(button('随机抽取').disabled);await change(document.querySelector('input[aria-label="抽取人数"]'),'4');await click(button('随机抽取'));await finishDraw();assert.equal(document.querySelectorAll('.lottery-person').length,4);
+ assert.equal(button('更新舞台名单'),undefined,'stage derives the current draw without a manual update action');const beforeStage=store.state('screen');await click(button('舞台模式'));await click(button('展示本轮内容'));await flush();assert.equal(document.querySelectorAll('.stage .lottery-person').length,4);assert.equal(document.querySelectorAll('.stage .lottery-person > img').length,4);assert.deepEqual(store.state('screen'),beforeStage,'opening the stage reads the saved draw without writing a projection snapshot');await click(button('返回操作 Esc'));
+ await click(button('清空当前界面全部内容'));assert.equal(clearScopes.at(-1),'activity:8');await click(button('确认清空本界面'));await flush();assert.equal(document.querySelectorAll('.lottery-person').length,0);assert.equal(store.data.players.length,4);assert.equal(store.state('tails').value.scores[ids[0]],9,'clearing the adopted draw still preserves another game');
+});
